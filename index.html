@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitPulse - 스마트 운동 루틴 & 트래커</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            900: '#064e3b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- PWA Manifest via Data URI -->
+    <link rel="manifest" href='data:application/manifest+json,{
+        "name": "FitPulse 운동 관리",
+        "short_name": "FitPulse",
+        "start_url": "./",
+        "display": "standalone",
+        "background_color": "#0f172a",
+        "theme_color": "#10b981",
+        "icons": [
+            {
+                "src": "https://placehold.co/192x192/10b981/ffffff?text=FP",
+                "sizes": "192x192",
+                "type": "image/png"
+            },
+            {
+                "src": "https://placehold.co/512x512/10b981/ffffff?text=FP",
+                "sizes": "512x512",
+                "type": "image/png"
+            }
+        ]
+    }'>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+
+    <style>
+        body {
+            font-family: 'Pretendard', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col pb-24 selection:bg-brand-500 selection:text-slate-950">
+
+    <!-- PWA Install Banner (Hidden by default) -->
+    <div id="installBanner" class="hidden bg-gradient-to-r from-brand-600 to-emerald-700 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
+        <div class="flex items-center space-x-3">
+            <div class="bg-white/20 p-2 rounded-xl">
+                <i class="fa-solid fa-mobile-screen-button text-xl"></i>
+            </div>
+            <div>
+                <p class="font-semibold text-sm">FitPulse 앱을 홈화면에 설치하세요!</p>
+                <p class="text-xs text-emerald-100">오프라인에서도 빠르게 실행할 수 있습니다.</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button id="installBtn" class="bg-white text-emerald-900 font-bold px-3 py-1.5 rounded-lg text-xs shadow hover:bg-emerald-50 transition">설치</button>
+            <button onclick="document.getElementById('installBanner').classList.add('hidden')" class="text-white/80 hover:text-white p-1">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-4 py-3">
+        <div class="max-w-md mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 bg-gradient-to-tr from-brand-600 to-emerald-400 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/20">
+                    <i class="fa-solid fa-dumbbell text-slate-950 text-base font-bold"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">FitPulse</h1>
+                    <p class="text-[10px] text-brand-400 font-medium uppercase tracking-wider">Workout Tracker</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div id="todayDateBadge" class="text-xs bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5">
+                    <i class="fa-regular fa-calendar text-brand-400"></i>
+                    <span id="headerDateText">오늘</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-md w-full mx-auto p-4 mb-16">
+        
+        <!-- ================= TAB 1: 오늘의 운동 ================= -->
+        <div id="tab-today" class="tab-content space-y-5">
+            <!-- Top Controls: Day selector & timer trigger -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="font-semibold text-sm text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-day text-brand-500"></i> 요일별 루틴 선택
+                    </h2>
+                    <span id="currentDayHighlight" class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">월요일</span>
+                </div>
+                <div class="grid grid-cols-7 gap-1.5 text-center" id="daySelectorTabs">
+                    <!-- JS generated day buttons -->
+                </div>
+            </div>
+
+            <!-- Rest Timer Widget Card -->
+            <div class="bg-gradient-to-br from-slate-900 to-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400">
+                        <i class="fa-solid fa-stopwatch text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xs font-medium text-slate-400">휴식 타이머</h3>
+                        <div id="timerDisplay" class="text-xl font-bold font-mono tracking-wider text-slate-100">00:00</div>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <button onclick="startRestTimer(30)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-slate-700 transition">30초</button>
+                    <button onclick="startRestTimer(60)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-slate-700 transition">60초</button>
+                    <button onclick="stopRestTimer()" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-rose-500/20 transition"><i class="fa-solid fa-rotate-left"></i></button>
+                </div>
+            </div>
+
+            <!-- Today's Exercise List -->
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-base text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-brand-500"></i> <span id="activeRoutineTitle">오늘의 운동 루틴</span>
+                    </h3>
+                    <span id="completedCountBadge" class="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full font-medium">0 / 0 완료</span>
+                </div>
+                
+                <div id="todayExercisesContainer" class="space-y-3">
+                    <!-- Dynamic exercises list injected here -->
+                </div>
+            </div>
+
+            <!-- Complete Workout Button -->
+            <button onclick="completeWorkout()" class="w-full bg-gradient-to-r from-brand-500 to-emerald-600 hover:from-brand-600 hover:to-emerald-700 text-slate-950 font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-brand-500/20 transition active:scale-[0.98] flex items-center justify-center gap-2">
+                <i class="fa-solid fa-circle-check text-lg"></i> 오늘 운동 완료 저장하기
+            </button>
+        </div>
+
+        <!-- ================= TAB 2: 주간 루틴 설정 ================= -->
+        <div id="tab-routine" class="tab-content hidden space-y-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <h2 class="font-bold text-base text-slate-100 mb-1 flex items-center gap-2">
+                    <i class="fa-solid fa-calendar-week text-brand-500"></i> 요일별 루틴 설정
+                </h2>
+                <p class="text-xs text-slate-400 mb-4">요일을 선택하고 해당 요일에 수행할 운동 종목들을 체크하세요.</p>
+                
+                <!-- Day selector for planning -->
+                <div class="grid grid-cols-7 gap-1 mb-4" id="planDaySelector">
+                    <!-- Rendered in JS -->
+                </div>
+
+                <div class="bg-slate-950/50 rounded-xl p-3 border border-slate-800/80 mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span id="selectedPlanDayName" class="font-semibold text-sm text-emerald-400">월요일 루틴</span>
+                        <span class="text-xs text-slate-400">운동을 선택해주세요</span>
+                    </div>
+                    
+                    <!-- Checklist of all available exercises grouped by category -->
+                    <div id="routineExerciseChecklist" class="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                        <!-- Injected via JS -->
+                    </div>
+                </div>
+
+                <button onclick="saveWeeklyRoutine()" class="w-full bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold py-3 px-4 rounded-xl shadow transition text-sm">
+                    설정 저장하기
+                </button>
+            </div>
+        </div>
+
+        <!-- ================= TAB 3: 운동 종목 관리 ================= -->
+        <div id="tab-library" class="tab-content hidden space-y-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <h2 class="font-bold text-base text-slate-100 mb-1 flex items-center gap-2">
+                    <i class="fa-solid fa-dumbbell text-brand-500"></i> 운동 종목 추가 및 관리
+                </h2>
+                <p class="text-xs text-slate-400 mb-4">파트별(상체, 하체, 코어, 유산소) 운동 종목을 추가하거나 삭제할 수 있습니다.</p>
+                
+                <!-- Add Exercise Form -->
+                <form onsubmit="addCustomExercise(event)" class="space-y-3 mb-6 bg-slate-950/40 p-3 rounded-xl border border-slate-800">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">파트 선택</label>
+                        <select id="newExCategory" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                            <option value="upper">상체 (Upper Body)</option>
+                            <option value="lower">하체 (Lower Body)</option>
+                            <option value="core">코어 / 복부 (Core)</option>
+                            <option value="cardio">유산소 (Cardio)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">운동 이름</label>
+                        <input type="text" id="newExName" placeholder="예: 인클라인 덤벨 프레스" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                    </div>
+                    <button type="submit" class="w-full bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold py-2.5 rounded-lg text-sm transition shadow">
+                        <i class="fa-solid fa-plus mr-1"></i> 종목 추가하기
+                    </button>
+                </form>
+
+                <!-- Category Tabs for Library -->
+                <div class="flex border-b border-slate-800 mb-3 overflow-x-auto">
+                    <button onclick="switchLibTab('upper')" id="libTab-upper" class="lib-tab-btn px-4 py-2 text-xs font-semibold border-b-2 border-brand-500 text-brand-400 whitespace-nowrap">상체</button>
+                    <button onclick="switchLibTab('lower')" id="libTab-lower" class="lib-tab-btn px-4 py-2 text-xs font-semibold border-b-2 border-transparent text-slate-400 whitespace-nowrap">하체</button>
+                    <button onclick="switchLibTab('core')" id="libTab-core" class="lib-tab-btn px-4 py-2 text-xs font-semibold border-b-2 border-transparent text-slate-400 whitespace-nowrap">코어</button>
+                    <button onclick="switchLibTab('cardio')" id="libTab-cardio" class="lib-tab-btn px-4 py-2 text-xs font-semibold border-b-2 border-transparent text-slate-400 whitespace-nowrap">유산소</button>
+                </div>
+
+                <!-- Exercise List by Category -->
+                <div id="libraryCategoryList" class="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                    <!-- Rendered in JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 4: 기록 및 통계 ================= -->
+        <div id="tab-history" class="tab-content hidden space-y-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="font-bold text-base text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-brand-500"></i> 운동 완료 기록
+                    </h2>
+                    <span id="totalWorkoutCount" class="text-xs bg-brand-500/10 text-brand-400 border border-brand-500/20 px-2 py-0.5 rounded-full font-bold">총 0회 완료</span>
+                </div>
+                
+                <div id="historyListContainer" class="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                    <!-- Rendered in JS -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur-lg border-t border-slate-800 z-40 max-w-md mx-auto">
+        <div class="grid grid-cols-4 py-2 px-1 text-center">
+            <button onclick="switchTab('today')" id="nav-today" class="nav-btn flex flex-col items-center justify-center text-brand-400 transition py-1">
+                <i class="fa-solid fa-fire text-lg mb-0.5"></i>
+                <span class="text-[10px] font-medium">오늘의 운동</span>
+            </button>
+            <button onclick="switchTab('routine')" id="nav-routine" class="nav-btn flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition py-1">
+                <i class="fa-solid fa-calendar-week text-lg mb-0.5"></i>
+                <span class="text-[10px] font-medium">주간 루틴</span>
+            </button>
+            <button onclick="switchTab('library')" id="nav-library" class="nav-btn flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition py-1">
+                <i class="fa-solid fa-dumbbell text-lg mb-0.5"></i>
+                <span class="text-[10px] font-medium">종목 관리</span>
+            </button>
+            <button onclick="switchTab('history')" id="nav-history" class="nav-btn flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition py-1">
+                <i class="fa-solid fa-chart-column text-lg mb-0.5"></i>
+                <span class="text-[10px] font-medium">기록</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Custom Toast / Notification Modal -->
+    <div id="toastContainer" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300 opacity-0 transform -translate-y-4">
+        <div id="toastMessage" class="bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs font-semibold flex items-center gap-2 border border-emerald-400/30">
+            <i class="fa-solid fa-circle-check"></i> <span>성공적으로 저장되었습니다!</span>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Days configuration
+        const DAYS = [
+            { id: 'mon', name: '월', fullName: '월요일' },
+            { id: 'tue', name: '화', fullName: '화요일' },
+            { id: 'wed', name: '수', fullName: '수요일' },
+            { id: 'thu', name: '목', fullName: '목요일' },
+            { id: 'fri', name: '금', fullName: '금요일' },
+            { id: 'sat', name: '토', fullName: '토요일' },
+            { id: 'sun', name: '일', fullName: '일요일' }
+        ];
+
+        const CATEGORIES = {
+            upper: { name: '상체', icon: 'fa-user-ninja' },
+            lower: { name: '하체', icon: 'fa-person-walking' },
+            core: { name: '코어/복부', icon: 'fa-bolt' },
+            cardio: { name: '유산소', icon: 'fa-heart-pulse' }
+        };
+
+        // Default Data Initialization
+        const DEFAULT_EXERCISES = {
+            upper: [
+                { id: 'ex_1', name: '벤치 프레스' },
+                { id: 'ex_2', name: '랫 풀다운' },
+                { id: 'ex_3', name: '오버헤드 프레스' },
+                { id: 'ex_4', name: '바벨 컬' },
+                { id: 'ex_5', name: '푸시업' }
+            ],
+            lower: [
+                { id: 'ex_6', name: '바벨 스쿼트' },
+                { id: 'ex_7', name: '레그 프레스' },
+                { id: 'ex_8', name: '레그 컬' },
+                { id: 'ex_9', name: '런지' }
+            ],
+            core: [
+                { id: 'ex_10', name: '플랭크' },
+                { id: 'ex_11', name: '크런치' },
+                { id: 'ex_12', name: '행잉 레그 레이즈' },
+                { id: 'ex_13', name: '러시아 투위스트' }
+            ],
+            cardio: [
+                { id: 'ex_14', name: '러닝머신 인터벌' },
+                { id: 'ex_15', name: '사이클' },
+                { id: 'ex_16', name: '줄넘기' },
+                { id: 'ex_17', name: '천국의 계단 (스텝퍼)' }
+            ]
+        };
+
+        const DEFAULT_ROUTINE = {
+            mon: ['ex_1', 'ex_2', 'ex_3'],
+            tue: ['ex_6', 'ex_7', 'ex_8'],
+            wed: ['ex_10', 'ex_11', 'ex_12'],
+            thu: ['ex_1', 'ex_4', 'ex_5'],
+            fri: ['ex_6', 'ex_9'],
+            sat: ['ex_14', 'ex_15'],
+            sun: ['ex_10', 'ex_14']
+        };
+
+        // State variables
+        let exercises = JSON.parse(localStorage.getItem('fitpulse_exercises')) || DEFAULT_EXERCISES;
+        let weeklyRoutine = JSON.parse(localStorage.getItem('fitpulse_routine')) || DEFAULT_ROUTINE;
+        let workoutHistory = JSON.parse(localStorage.getItem('fitpulse_history')) || [];
+
+        // Determine current day (0=Sun, 1=Mon, ..., 6=Sat)
+        const jsDay = new Date().getDay();
+        const dayKeyMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        let activeTodayDay = dayKeyMap[jsDay];
+        let activePlanDay = 'mon';
+        let activeLibCat = 'upper';
+
+        // Today's workout tracking logs state
+        let workoutLogs = {}; // { exerciseId: [{set: 1, weight: 60, reps: 10, done: false}, ...] }
+
+        // Rest timer interval
+        let timerInterval = null;
+        let timerSeconds = 0;
+
+        // Initialize App on load
+        window.onload = function () {
+            updateDateHeader();
+            renderDaySelectorTabs();
+            renderTodayExercises();
+            renderPlanDaySelector();
+            renderRoutineChecklist();
+            renderLibraryList();
+            renderHistoryList();
+            
+            // Register PWA service worker via Blob
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    self.addEventListener('install', e => self.skipWaiting());
+                    self.addEventListener('activate', e => self.clients.claim());
+                    self.addEventListener('fetch', e => {
+                        e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+                    });
+                `;
+                const blob = new Blob([swCode], { type: 'text/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                navigator.serviceWorker.register(swUrl).catch(err => console.log('SW registration failed:', err));
+            }
+        };
+
+        // PWA Install Prompt Handler
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('installBanner').classList.remove('hidden');
+        });
+        document.getElementById('installBtn')?.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    document.getElementById('installBanner').classList.add('hidden');
+                }
+                deferredPrompt = null;
+            }
+        });
+
+        function updateDateHeader() {
+            const today = new Date();
+            const options = { month: 'long', day: 'numeric', weekday: 'short' };
+            document.getElementById('headerDateText').innerText = today.toLocaleDateString('ko-KR', options);
+        }
+
+        // Tab Switching
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-brand-400');
+                btn.classList.add('text-slate-400');
+            });
+            event.currentTarget.classList.remove('text-slate-400');
+            event.currentTarget.classList.add('text-brand-400');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Show Toast Notification
+        function showToast(msg = '저장되었습니다!') {
+            const toast = document.getElementById('toastContainer');
+            const msgSpan = toast.querySelector('span');
+            msgSpan.innerText = msg;
+            toast.classList.remove('opacity-0', '-translate-y-4');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-4');
+            }, 2500);
+        }
+
+        /* ================= TODAY'S WORKOUT LOGIC ================= */
+        function renderDaySelectorTabs() {
+            const container = document.getElementById('daySelectorTabs');
+            container.innerHTML = '';
+            DAYS.forEach(d => {
+                const isActive = activeTodayDay === d.id;
+                container.innerHTML += `
+                    <button onclick="selectTodayDay('${d.id}')" class="py-2 rounded-xl text-xs font-bold transition border ${isActive ? 'bg-brand-500 text-slate-950 border-brand-400 shadow-md shadow-brand-500/20' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}">
+                        ${d.name}
+                    </button>
+                `;
+            });
+            const selectedObj = DAYS.find(d => d.id === activeTodayDay);
+            document.getElementById('currentDayHighlight').innerText = selectedObj.fullName;
+        }
+
+        function selectTodayDay(dayId) {
+            activeTodayDay = dayId;
+            renderDaySelectorTabs();
+            renderTodayExercises();
+        }
+
+        function getExerciseDetails(exId) {
+            for (let cat in exercises) {
+                const found = exercises[cat].find(e => e.id === exId);
+                if (found) return { ...found, category: cat };
+            }
+            return null;
+        }
+
+        function renderTodayExercises() {
+            const container = document.getElementById('todayExercisesContainer');
+            const routineIds = weeklyRoutine[activeTodayDay] || [];
+            
+            document.getElementById('activeRoutineTitle').innerText = `${DAYS.find(d => d.id === activeTodayDay).fullName} 루틴`;
+
+            if (routineIds.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-slate-400 space-y-3">
+                        <i class="fa-solid fa-mug-hot text-3xl text-slate-600"></i>
+                        <p class="text-sm font-medium">등록된 운동이 없습니다.</p>
+                        <p class="text-xs text-slate-500">'주간 루틴 설정' 탭에서 이 요일에 운동을 추가해보세요.</p>
+                    </div>
+                `;
+                document.getElementById('completedCountBadge').innerText = `0 / 0 완료`;
+                return;
+            }
+
+            // Initialize workout logs structure if not present
+            if (!workoutLogs[activeTodayDay]) {
+                workoutLogs[activeTodayDay] = {};
+                routineIds.forEach(id => {
+                    workoutLogs[activeTodayDay][id] = [
+                        { set: 1, weight: '', reps: '', done: false },
+                        { set: 2, weight: '', reps: '', done: false },
+                        { set: 3, weight: '', reps: '', done: false }
+                    ];
+                });
+            }
+
+            let html = '';
+            let completedSetsCount = 0;
+            let totalSetsCount = 0;
+
+            routineIds.forEach((exId, idx) => {
+                const ex = getExerciseDetails(exId);
+                if (!ex) return;
+
+                const sets = workoutLogs[activeTodayDay][exId] || [];
+                let exDone = sets.length > 0 && sets.every(s => s.done);
+
+                sets.forEach(s => {
+                    totalSetsCount++;
+                    if (s.done) completedSetsCount++;
+                });
+
+                html += `
+                    <div class="bg-slate-900 border ${exDone ? 'border-brand-500/50 bg-slate-900/90' : 'border-slate-800'} rounded-2xl p-4 shadow-md transition-all">
+                        <div class="flex justify-between items-center mb-3">
+                            <div class="flex items-center space-x-2.5">
+                                <span class="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-bold text-brand-400 border border-slate-700">${idx + 1}</span>
+                                <div>
+                                    <h4 class="font-bold text-sm text-slate-100">${ex.name}</h4>
+                                    <span class="text-[10px] text-slate-400 uppercase tracking-wide">${CATEGORIES[ex.category]?.name || ''}</span>
+                                </div>
+                            </div>
+                            <button onclick="addSetToExercise('${activeTodayDay}', '${exId}')" class="text-xs bg-slate-800 hover:bg-slate-700 text-brand-400 px-2.5 py-1 rounded-lg border border-slate-700 transition flex items-center gap-1">
+                                <i class="fa-solid fa-plus text-[10px]"></i> 세트추가
+                            </button>
+                        </div>
+
+                        <!-- Sets table -->
+                        <div class="space-y-2">
+                `;
+
+                sets.forEach((setObj, sIdx) => {
+                    html += `
+                        <div class="flex items-center gap-2 bg-slate-950/40 p-2 rounded-xl border border-slate-800/80">
+                            <span class="text-xs font-bold text-slate-400 w-8 text-center">${setObj.set}세트</span>
+                            <div class="flex-1 grid grid-cols-2 gap-2">
+                                <div class="relative">
+                                    <input type="number" placeholder="중량" value="${setObj.weight}" onchange="updateSetData('${activeTodayDay}', '${exId}', ${sIdx}, 'weight', this.value)" class="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-brand-500 pl-7">
+                                    <span class="absolute left-2.5 top-1.5 text-[10px] text-slate-500">kg</span>
+                                </div>
+                                <div class="relative">
+                                    <input type="number" placeholder="횟수" value="${setObj.reps}" onchange="updateSetData('${activeTodayDay}', '${exId}', ${sIdx}, 'reps', this.value)" class="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-brand-500 pl-7">
+                                    <span class="absolute left-2.5 top-1.5 text-[10px] text-slate-500">reps</span>
+                                </div>
+                            </div>
+                            <button onclick="toggleSetDone('${activeTodayDay}', '${exId}', ${sIdx})" class="w-8 h-8 rounded-lg flex items-center justify-center transition ${setObj.done ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20' : 'bg-slate-800 text-slate-500 hover:text-slate-300 border border-slate-700'}">
+                                <i class="fa-solid fa-check text-xs"></i>
+                            </button>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            document.getElementById('completedCountBadge').innerText = `${completedSetsCount} / ${totalSetsCount} 세트 완료`;
+        }
+
+        function addSetToExercise(dayId, exId) {
+            if (!workoutLogs[dayId]) workoutLogs[dayId] = {};
+            if (!workoutLogs[dayId][exId]) workoutLogs[dayId][exId] = [];
+            const nextSetNum = workoutLogs[dayId][exId].length + 1;
+            workoutLogs[dayId][exId].push({ set: nextSetNum, weight: '', reps: '', done: false });
+            renderTodayExercises();
+        }
+
+        function updateSetData(dayId, exId, setIdx, field, val) {
+            if (workoutLogs[dayId] && workoutLogs[dayId][exId] && workoutLogs[dayId][exId][setIdx]) {
+                workoutLogs[dayId][exId][setIdx][field] = val;
+            }
+        }
+
+        function toggleSetDone(dayId, exId, setIdx) {
+            if (workoutLogs[dayId] && workoutLogs[dayId][exId] && workoutLogs[dayId][exId][setIdx]) {
+                const item = workoutLogs[dayId][exId][setIdx];
+                item.done = !item.done;
+                if (item.done) {
+                    startRestTimer(60); // Auto trigger 60s rest timer when a set is finished
+                }
+                renderTodayExercises();
+            }
+        }
+
+        function completeWorkout() {
+            const routineIds = weeklyRoutine[activeTodayDay] || [];
+            if (routineIds.length === 0) {
+                showToast('완료할 운동이 없습니다!');
+                return;
+            }
+
+            const record = {
+                id: 'rec_' + Date.now(),
+                date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' }),
+                dayName: DAYS.find(d => d.id === activeTodayDay).fullName,
+                routine: routineIds.map(exId => {
+                    const ex = getExerciseDetails(exId);
+                    const sets = workoutLogs[activeTodayDay]?.[exId] || [];
+                    return {
+                        name: ex ? ex.name : '알 수 없음',
+                        sets: sets.filter(s => s.done)
+                    };
+                }).filter(r => r.sets.length > 0)
+            };
+
+            if (record.routine.length === 0) {
+                showToast('완료 체크된 세트가 없습니다.');
+                return;
+            }
+
+            workoutHistory.unshift(record);
+            localStorage.setItem('fitpulse_history', JSON.stringify(workoutHistory));
+            renderHistoryList();
+            showToast('오늘의 운동 기록이 저장되었습니다! 🎉');
+        }
+
+        /* ================= REST TIMER LOGIC ================= */
+        function startRestTimer(seconds) {
+            stopRestTimer();
+            timerSeconds = seconds;
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                timerSeconds--;
+                updateTimerDisplay();
+                if (timerSeconds <= 0) {
+                    stopRestTimer();
+                    showToast('휴식 시간이 종료되었습니다! 🔥');
+                }
+            }, 1000);
+        }
+
+        function stopRestTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerSeconds = 0;
+            updateTimerDisplay();
+        }
+
+        function updateTimerDisplay() {
+            const min = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+            const sec = String(timerSeconds % 60).padStart(2, '0');
+            document.getElementById('timerDisplay').innerText = `${min}:${sec}`;
+        }
+
+        /* ================= WEEKLY ROUTINE PLANNER ================= */
+        function renderPlanDaySelector() {
+            const container = document.getElementById('planDaySelector');
+            container.innerHTML = '';
+            DAYS.forEach(d => {
+                const isActive = activePlanDay === d.id;
+                container.innerHTML += `
+                    <button onclick="selectPlanDay('${d.id}')" class="py-2 rounded-lg text-xs font-bold transition border ${isActive ? 'bg-brand-500 text-slate-950 border-brand-400' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}">
+                        ${d.name}
+                    </button>
+                `;
+            });
+            document.getElementById('selectedPlanDayName').innerText = `${DAYS.find(d => d.id === activePlanDay).fullName} 루틴 설정`;
+            renderRoutineChecklist();
+        }
+
+        function selectPlanDay(dayId) {
+            activePlanDay = dayId;
+            renderPlanDaySelector();
+        }
+
+        function renderRoutineChecklist() {
+            const container = document.getElementById('routineExerciseChecklist');
+            const assigned = weeklyRoutine[activePlanDay] || [];
+            let html = '';
+
+            for (let catKey in exercises) {
+                const catName = CATEGORIES[catKey].name;
+                const list = exercises[catKey];
+                if (list.length === 0) continue;
+
+                html += `
+                    <div class="mb-3">
+                        <h5 class="text-xs font-bold text-brand-400 mb-1.5 uppercase tracking-wider">${catName}</h5>
+                        <div class="space-y-1">
+                `;
+
+                list.forEach(ex => {
+                    const isChecked = assigned.includes(ex.id);
+                    html += `
+                        <label class="flex items-center justify-between p-2 rounded-lg bg-slate-900 border ${isChecked ? 'border-brand-500/50 bg-brand-500/5' : 'border-slate-800'} cursor-pointer hover:bg-slate-850 transition">
+                            <span class="text-xs text-slate-200 font-medium">${ex.name}</span>
+                            <input type="checkbox" value="${ex.id}" ${isChecked ? 'checked' : ''} onchange="toggleRoutineExercise('${ex.id}')" class="w-4 h-4 accent-brand-500 rounded bg-slate-800 border-slate-700">
+                        </label>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function toggleRoutineExercise(exId) {
+            if (!weeklyRoutine[activePlanDay]) weeklyRoutine[activePlanDay] = [];
+            const idx = weeklyRoutine[activePlanDay].indexOf(exId);
+            if (idx > -1) {
+                weeklyRoutine[activePlanDay].splice(idx, 1);
+            } else {
+                weeklyRoutine[activePlanDay].push(exId);
+            }
+        }
+
+        function saveWeeklyRoutine() {
+            localStorage.setItem('fitpulse_routine', JSON.stringify(weeklyRoutine));
+            showToast('주간 루틴이 저장되었습니다!');
+            renderTodayExercises();
+        }
+
+        /* ================= EXERCISE LIBRARY MANAGEMENT ================= */
+        function switchLibTab(catKey) {
+            activeLibCat = catKey;
+            document.querySelectorAll('.lib-tab-btn').forEach(btn => {
+                btn.classList.remove('border-brand-500', 'text-brand-400');
+                btn.classList.add('border-transparent', 'text-slate-400');
+            });
+            document.getElementById(`libTab-${catKey}`).classList.add('border-brand-500', 'text-brand-400');
+            document.getElementById(`libTab-${catKey}`).classList.remove('border-transparent', 'text-slate-400');
+            renderLibraryList();
+        }
+
+        function renderLibraryList() {
+            const container = document.getElementById('libraryCategoryList');
+            const list = exercises[activeLibCat] || [];
+
+            if (list.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">등록된 운동 종목이 없습니다.</p>`;
+                return;
+            }
+
+            let html = '';
+            list.forEach(ex => {
+                html += `
+                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/50 border border-slate-800">
+                        <span class="text-xs font-medium text-slate-200">${ex.name}</span>
+                        <button onclick="deleteCustomExercise('${activeLibCat}', '${ex.id}')" class="text-rose-400 hover:text-rose-300 p-1 text-xs transition">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function addCustomExercise(e) {
+            e.preventDefault();
+            const cat = document.getElementById('newExCategory').value;
+            const nameInput = document.getElementById('newExName');
+            const name = nameInput.value.trim();
+
+            if (!name) return;
+
+            const newId = 'ex_custom_' + Date.now();
+            if (!exercises[cat]) exercises[cat] = [];
+            exercises[cat].push({ id: newId, name: name });
+
+            localStorage.setItem('fitpulse_exercises', JSON.stringify(exercises));
+            nameInput.value = '';
+            showToast('새 운동 종목이 추가되었습니다!');
+            renderLibraryList();
+            renderRoutineChecklist();
+        }
+
+        function deleteCustomExercise(cat, exId) {
+            exercises[cat] = exercises[cat].filter(e => e.id !== exId);
+            
+            // Also remove from routine if assigned
+            for (let d in weeklyRoutine) {
+                weeklyRoutine[d] = weeklyRoutine[d].filter(id => id !== exId);
+            }
+
+            localStorage.setItem('fitpulse_exercises', JSON.stringify(exercises));
+            localStorage.setItem('fitpulse_routine', JSON.stringify(weeklyRoutine));
+            
+            showToast('운동 종목이 삭제되었습니다.');
+            renderLibraryList();
+            renderRoutineChecklist();
+            renderTodayExercises();
+        }
+
+        /* ================= HISTORY LOGS ================= */
+        function renderHistoryList() {
+            const container = document.getElementById('historyListContainer');
+            document.getElementById('totalWorkoutCount').innerText = `총 ${workoutHistory.length}회 완료`;
+
+            if (workoutHistory.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 text-slate-500 space-y-2">
+                        <i class="fa-solid fa-clock-rotate-left text-3xl text-slate-600"></i>
+                        <p class="text-sm">아직 완료된 운동 기록이 없습니다.</p>
+                        <p class="text-xs text-slate-600">오늘의 운동을 완료하고 기록을 남겨보세요!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            workoutHistory.forEach(rec => {
+                let routineSummaryHtml = '';
+                rec.routine.forEach(item => {
+                    const setsStr = item.sets.map(s => `${s.weight ? s.weight + 'kg' : ''} ${s.reps}회`).join(' / ');
+                    routineSummaryHtml += `
+                        <div class="text-xs text-slate-300 py-1 border-b border-slate-800/60 last:border-0 flex justify-between">
+                            <span class="font-medium text-slate-200">${item.name}</span>
+                            <span class="text-slate-400 text-[11px]">${setsStr}</span>
+                        </div>
+                    `;
+                });
+
+                html += `
+                    <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-emerald-400 flex items-center gap-1.5"><i class="fa-solid fa-calendar-check"></i> ${rec.date} (${rec.dayName})</span>
+                            <button onclick="deleteHistoryRecord('${rec.id}')" class="text-slate-500 hover:text-rose-400 text-xs transition"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="space-y-1 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+                            ${routineSummaryHtml}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function deleteHistoryRecord(recId) {
+            workoutHistory = workoutHistory.filter(r => r.id !== recId);
+            localStorage.setItem('fitpulse_history', JSON.stringify(workoutHistory));
+            renderHistoryList();
+            showToast('기록이 삭제되었습니다.');
+        }
+    </script>
+</body>
+</html>

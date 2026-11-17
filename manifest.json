@@ -1,0 +1,8 @@
+{
+  "name": "나만의 운동 루틴 어플",
+  "short_name": "운동어플",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6"
+}
